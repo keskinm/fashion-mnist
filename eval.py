@@ -31,7 +31,7 @@ class FMModelsEvaluator:
         os.makedirs(self.save_model_dir_path, exist_ok=True)
 
         self.models = {'two_layers': TwoLayers(num_classes=10).to(self.device),
-                       'vgg16_pretrained': vgg16(pretrained=True, num_classes=1000).to(self.device),
+                       'vgg16_pretrained': vgg16(pretrained=True, num_classes=10).to(self.device),
                        'vgg16': vgg16(num_classes=10).to(self.device)}
 
         if test_model is not None:
@@ -93,15 +93,16 @@ class FMModelsEvaluator:
 
     def train(self, model, train_set_loader, optimizer, criterion, model_name):
         epoch_n = self.train_epoch
+
         if isinstance(model, VGG):
             epoch_n = 20
+            if 'pretrained' in model_name:
+                self.freeze_params(model)
 
         model = model.train()
         loss = None
         epoch = None
         losses = []
-
-        # self.freeze_params(model)
 
         for epoch in range(1, epoch_n + 1):
             for batch_id, (image, label) in enumerate(train_set_loader):
@@ -115,10 +116,7 @@ class FMModelsEvaluator:
                 optimizer.step()
 
                 if batch_id % 1000 == 0:
-                    print('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch, self.train_epoch))
-
-                # if batch_id == 2:
-                #     break
+                    print('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch, epoch_n))
 
         self.plot_losses(losses, model_name)
         self.save_model(epoch, loss, model, optimizer, model_name)
@@ -139,10 +137,14 @@ class FMModelsEvaluator:
         plt.savefig(plot_file_path)
 
     def freeze_params(self, model):
-        # for name, param in model.named_parameters():
-        #     if name in ['features.0.weight', 'features.0.bias']:
-        #         param.requires_grad = False
-        pass
+        for name, param in model.named_parameters():
+            low_layers = ['0.', '2.', '5.', '7.', '10.']
+            low_layer_in_name = False
+            for layer_idx in low_layers:
+                if layer_idx in name:
+                    low_layer_in_name = True
+            if low_layer_in_name and ('features' in name):
+                param.requires_grad = False
 
     def compute_accuracy(self, model, data_set):
         model = model.eval()

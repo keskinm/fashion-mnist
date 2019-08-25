@@ -88,8 +88,11 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
+
         state_dict['features.0.weight'] = state_dict['features.0.weight'][:, 0, :, :].unsqueeze(1)
-        model.load_state_dict(state_dict)
+        state_dict = {param_name: param for param_name, param in state_dict.items() if not('classifier' in param_name)}
+
+        model.load_state_dict(state_dict, strict=False)
     return model
 
 
