@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 
 
 class FMModelsEvaluator:
-    def __init__(self, train_epoch, lr, train_batch_size, test_model, model_type, threshold_validation_accuracy, seed, save_dir, resume_model):
+    def __init__(self, train_epoch, lr, train_batch_size, test_model, model_type, threshold_validation_accuracy, seed, save_dir, resume_model, optimizer):
         self.train_epoch = train_epoch
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.lr = lr[0]
+        self.lr = lr
         self.train_batch_size = train_batch_size
         self.model_type = model_type
         self.threshold_validation_accuracy = threshold_validation_accuracy
@@ -46,6 +46,8 @@ class FMModelsEvaluator:
         else:
             self.model_to_resume_path = None
 
+        self.optimizer = optimizer
+
     def prepare_data(self):
         transform = transforms.Compose([transforms.ToTensor()])
 
@@ -67,12 +69,23 @@ class FMModelsEvaluator:
             models = self.models
 
         for model_name, model in models.items():
-            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=self.lr)
-            # optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=0.0006, momentum=0.9)
-            criterion = nn.CrossEntropyLoss()
+            criterion, optimizer = self.init_optimizer(model, model_name)
             self.train(model, train_set_loader, optimizer=optimizer, criterion=criterion, model_name=model_name)
             accuracy = self.compute_accuracy(model, val_set_loader)
             self.dump_metrics(accuracy, model_name)
+
+    def init_optimizer(self, model, model_name):
+        if isinstance(model, VGG) and 'pretrained' in model_name:
+            self.freeze_params(model)
+
+        if self.optimizer == 'adam':
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=self.lr)
+
+        else:
+            optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=self.lr, momentum=0.9)
+
+        criterion = nn.CrossEntropyLoss()
+        return criterion, optimizer
 
     def run(self):
         train_set_loader, val_set_loader, test_set_loader = self.prepare_data()
@@ -83,24 +96,17 @@ class FMModelsEvaluator:
 
         elif self.model_to_resume_path is not None:
             model = self.resume_model
-            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=self.lr)
-            criterion = nn.CrossEntropyLoss()
-            model, optimizer = self.load_model(model=model, optimizer=optimizer, model_params_path=self.model_to_resume_path)
-            self.train(model, train_set_loader, optimizer, criterion, self.resume_model_name)
+            criterion, optimizer = self.init_optimizer(model, self.resume_model_name)
+            model, optimizer, loss = self.load_model(model=model, optimizer=optimizer, model_params_path=self.model_to_resume_path)
+            self.train(model, train_set_loader, optimizer, criterion, self.resume_model_name, loss=loss)
 
         else:
             self.eval(train_set_loader, val_set_loader)
 
-    def train(self, model, train_set_loader, optimizer, criterion, model_name):
+    def train(self, model, train_set_loader, optimizer, criterion, model_name, loss=None):
         epoch_n = self.train_epoch
-
-        if isinstance(model, VGG):
-            epoch_n = 20
-            if 'pretrained' in model_name:
-                self.freeze_params(model)
-
         model = model.train()
-        loss = None
+
         epoch = None
         losses = []
 
@@ -117,6 +123,9 @@ class FMModelsEvaluator:
 
                 if batch_id % 1000 == 0:
                     print('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch, epoch_n))
+
+                if batch_id % 200 == 0:
+                    self.save_model(epoch, loss, model, optimizer, model_name)
 
         self.plot_losses(losses, model_name)
         self.save_model(epoch, loss, model, optimizer, model_name)
@@ -176,7 +185,7 @@ class FMModelsEvaluator:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             loss = checkpoint['loss']
-            return model.to(self.device), optimizer
+            return model.to(self.device), optimizer, loss
 
         else:
             return model.to(self.device)
@@ -215,7 +224,8 @@ def main():
 
     parser.add_argument(
         '--lr',
-        default=[0.005],
+        default=0.005,
+        type=float,
         help=
         ''
     )
@@ -245,6 +255,14 @@ def main():
     parser.add_argument(
         '--save-dir',
         default='./data',
+        help=
+        ''
+    )
+
+    parser.add_argument(
+        '--optimizer',
+        choices=['adam', 'sgd'],
+        default='adam',
         help=
         ''
     )
