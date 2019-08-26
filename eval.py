@@ -16,15 +16,14 @@ logger = logging.getLogger(__name__)
 
 class FMModelsEvaluator:
     def __init__(self, train_epoch, lr, train_batch_size, test_model,
-                 model_type, threshold_validation_accuracy, seed, save_dir,
-                 resume_model, optimizer):
+                 model_type, seed, save_dir, resume_model, optimizer,
+                 dump_metrics_frequency):
         self.train_epoch = train_epoch
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
         self.lr = lr
         self.train_batch_size = train_batch_size
         self.model_type = model_type
-        self.threshold_validation_accuracy = threshold_validation_accuracy
         if seed is not None:
             torch.manual_seed(seed)
         self.save_dir = save_dir
@@ -55,6 +54,7 @@ class FMModelsEvaluator:
             self.model_to_resume_path = None
 
         self.optimizer = optimizer
+        self.dump_metrics_frequency = dump_metrics_frequency
 
     def prepare_data(self):
         transform = transforms.Compose([transforms.ToTensor()])
@@ -70,9 +70,8 @@ class FMModelsEvaluator:
                                          train=False,
                                          transform=transform)
 
-        train_set_loader = torch.utils.data.DataLoader(train_set,
-                                                       batch_size=50,
-                                                       shuffle=True)
+        train_set_loader = torch.utils.data.DataLoader(
+            train_set, batch_size=self.train_batch_size, shuffle=True)
         val_set_loader = torch.utils.data.DataLoader(val_set,
                                                      batch_size=50,
                                                      shuffle=True)
@@ -95,13 +94,12 @@ class FMModelsEvaluator:
 
         for model_name, model in models.items():
             criterion, optimizer = self.init_optimizer(model, model_name)
-            self.train(model,
-                       train_set_loader,
+            self.train(model=model,
+                       train_set_loader=train_set_loader,
+                       val_set_loader=val_set_loader,
                        optimizer=optimizer,
                        criterion=criterion,
                        model_name=model_name)
-            accuracy = self.compute_accuracy(model, val_set_loader)
-            self.dump_metrics(accuracy, model_name)
 
     def init_optimizer(self, model, model_name):
         if isinstance(model, VGG) and 'pretrained' in model_name:
@@ -128,22 +126,28 @@ class FMModelsEvaluator:
             model = self.load_model(model=self.test_model,
                                     optimizer=None,
                                     model_params_path=self.model_to_test_path)
+
+            inference_time_start = time.time()
             self.compute_accuracy(model, test_set_loader)
+            inference_time = time.time() - inference_time_start
+            logging.info(inference_time)
 
         elif self.model_to_resume_path is not None:
             model = self.resume_model
             criterion, optimizer = self.init_optimizer(model,
                                                        self.resume_model_name)
-            model, optimizer, loss = self.load_model(
+            model, optimizer, loss, epoch = self.load_model(
                 model=model,
                 optimizer=optimizer,
                 model_params_path=self.model_to_resume_path)
-            self.train(model,
-                       train_set_loader,
-                       optimizer,
-                       criterion,
-                       self.resume_model_name,
-                       loss=loss)
+            self.train(model=model,
+                       train_set_loader=train_set_loader,
+                       val_set_loader=val_set_loader,
+                       optimizer=optimizer,
+                       criterion=criterion,
+                       model_name=self.resume_model_name,
+                       loss=loss,
+                       epoch_start_idx=epoch)
 
         else:
             self.eval(train_set_loader, val_set_loader)
@@ -151,17 +155,19 @@ class FMModelsEvaluator:
     def train(self,
               model,
               train_set_loader,
+              val_set_loader,
               optimizer,
               criterion,
               model_name,
-              loss=None):
+              loss=None,
+              epoch_start_idx=1):
+
         epoch_n = self.train_epoch
         model = model.train()
-
         epoch = None
         losses = []
 
-        for epoch in range(1, epoch_n + 1):
+        for epoch in range(epoch_start_idx, epoch_n + 1):
             for batch_id, (image, label) in enumerate(train_set_loader):
                 logger.info(batch_id)
                 label, image = label.to(self.device), image.to(self.device)
@@ -172,17 +178,24 @@ class FMModelsEvaluator:
                 loss.backward()
                 optimizer.step()
 
-                if batch_id % 1000 == 0:
-                    logger.info('Loss :{:.4f} Epoch[{}/{}]'.format(
-                        loss.item(), epoch, epoch_n))
+                if batch_id % self.dump_metrics_frequency == 0:
+                    self.dump_metrics_and_save_model(epoch, epoch_n, loss,
+                                                     losses, model, model_name,
+                                                     optimizer, val_set_loader)
 
-                if batch_id % 200 == 0:
-                    self.save_model(epoch, loss, model, optimizer, model_name)
-
-        self.plot_losses(losses, model_name)
-        self.save_model(epoch, loss, model, optimizer, model_name)
+        self.dump_metrics_and_save_model(epoch, epoch_n, loss, losses, model,
+                                         model_name, optimizer, val_set_loader)
 
         return model
+
+    def dump_metrics_and_save_model(self, epoch, epoch_n, loss, losses, model,
+                                    model_name, optimizer, val_set_loader):
+        accuracy = self.compute_accuracy(model, val_set_loader)
+        self.dump_accuracy(accuracy, model_name)
+        self.save_model(epoch, loss, model, optimizer, model_name)
+        self.plot_losses(losses, model_name)
+        logger.info('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch,
+                                                       epoch_n))
 
     def save_model(self, epoch, loss, model, optimizer, model_name):
         save_model_file_path = os.path.join(self.save_model_dir_path,
@@ -200,7 +213,8 @@ class FMModelsEvaluator:
         plot_file_path = os.path.join(self.loss_plots_dir, model_name)
         plt.savefig(plot_file_path)
 
-    def freeze_params(self, model):
+    @staticmethod
+    def freeze_params(model):
         for name, param in model.named_parameters():
             low_layers = ['0.', '2.', '5.', '7.', '10.']
             low_layer_in_name = False
@@ -227,12 +241,13 @@ class FMModelsEvaluator:
         logger.info(accuracy)
         return accuracy
 
-    def dump_metrics(self, accuracy, model_name):
-        metrics_file_path = os.path.join(self.save_dir, 'metrics.txt')
+    def dump_accuracy(self, accuracy, model_name):
+        metrics_dir_path = os.path.join(self.save_dir, 'metrics')
+        metrics_file_path = os.path.join(metrics_dir_path,
+                                         '{}.txt'.format(model_name))
         with open(metrics_file_path, "a") as opened_metrics_file:
             opened_metrics_file.write(
-                "model name:{} \naccuracy: {}\n\n".format(
-                    model_name, accuracy))
+                "val accuracy:\naccuracy: {}\n\n".format(accuracy))
 
     def load_model(self, model, optimizer, model_params_path):
         checkpoint = torch.load(model_params_path)
@@ -242,7 +257,7 @@ class FMModelsEvaluator:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
             loss = checkpoint['loss']
-            return model.to(self.device), optimizer, loss
+            return model.to(self.device), optimizer, loss, epoch
 
         else:
             return model.to(self.device)
@@ -269,15 +284,11 @@ def main():
                         help='model path and model name',
                         default=None)
 
-    parser.add_argument('--train-batch-size', default=[50], help='')
+    parser.add_argument('--train-batch-size', default=50, help='')
 
     parser.add_argument('--lr', default=0.005, type=float, help='')
 
     parser.add_argument('--train-epoch', default=5, type=int, help='')
-
-    parser.add_argument('--threshold-validation-accuracy',
-                        default=0.80,
-                        help='')
 
     parser.add_argument('--seed', default=42, help='')
 
@@ -287,6 +298,11 @@ def main():
                         choices=['adam', 'sgd'],
                         default='adam',
                         help='')
+
+    parser.add_argument('--dump-metrics-frequency',
+                        metavar='Batch_n',
+                        default='200',
+                        help='dump metrics every Batch_n batches')
 
     args = parser.parse_args()
     args = vars(args)
