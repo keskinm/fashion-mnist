@@ -163,7 +163,7 @@ class FMModelsEvaluator:
 
         for epoch in range(1, epoch_n + 1):
             for batch_id, (image, label) in enumerate(train_set_loader):
-                print(batch_id)
+                logger.info(batch_id)
                 label, image = label.to(self.device), image.to(self.device)
                 output = model(image)
                 loss = criterion(output, label)
@@ -173,7 +173,8 @@ class FMModelsEvaluator:
                 optimizer.step()
 
                 if batch_id % 1000 == 0:
-                    print('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch, epoch_n))
+                    logger.info('Loss :{:.4f} Epoch[{}/{}]'.format(
+                        loss.item(), epoch, epoch_n))
 
                 if batch_id % 200 == 0:
                     self.save_model(epoch, loss, model, optimizer, model_name)
@@ -215,7 +216,7 @@ class FMModelsEvaluator:
             correct = 0
             total = 0
             for batch_id, (image, label) in enumerate(data_set):
-                print("compute_acc", batch_id)
+                logger.info("compute_acc", batch_id)
                 image = image.to(self.device)
                 label = label.to(self.device)
                 outputs = model(image)
@@ -223,7 +224,7 @@ class FMModelsEvaluator:
                 total += label.size(0)
                 correct += (predicted == label).sum().item()
             accuracy = 100 * correct / total
-        print(accuracy)
+        logger.info(accuracy)
         return accuracy
 
     def dump_metrics(self, accuracy, model_name):
