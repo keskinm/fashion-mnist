@@ -3,7 +3,9 @@ import torch.nn as nn
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
 __all__ = [
-    'VGG', 'vgg16', 'vgg16_bn',
+    'VGG',
+    'vgg16',
+    'vgg16_bn',
 ]
 
 model_urls = {
@@ -40,7 +42,9 @@ class VGG(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight,
+                                        mode='fan_out',
+                                        nonlinearity='relu')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
@@ -102,4 +106,3 @@ def vgg16(pretrained=False, progress=True, **kwargs):
 
 def vgg16_bn(pretrained=False, progress=True, **kwargs):
     return _vgg('vgg16_bn', 'D', True, pretrained, progress, **kwargs)
-

@@ -15,9 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 class FMModelsEvaluator:
-    def __init__(self, train_epoch, lr, train_batch_size, test_model, model_type, threshold_validation_accuracy, seed, save_dir, resume_model, optimizer):
+    def __init__(self, train_epoch, lr, train_batch_size, test_model,
+                 model_type, threshold_validation_accuracy, seed, save_dir,
+                 resume_model, optimizer):
         self.train_epoch = train_epoch
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
         self.lr = lr
         self.train_batch_size = train_batch_size
         self.model_type = model_type
@@ -30,9 +33,14 @@ class FMModelsEvaluator:
         os.makedirs(self.loss_plots_dir, exist_ok=True)
         os.makedirs(self.save_model_dir_path, exist_ok=True)
 
-        self.models = {'two_layers': TwoLayers(num_classes=10).to(self.device),
-                       'vgg16_pretrained': vgg16(pretrained=True, num_classes=10).to(self.device),
-                       'vgg16': vgg16(num_classes=10).to(self.device)}
+        self.models = {
+            'two_layers':
+            TwoLayers(num_classes=10).to(self.device),
+            'vgg16_pretrained':
+            vgg16(pretrained=True, num_classes=10).to(self.device),
+            'vgg16':
+            vgg16(num_classes=10).to(self.device)
+        }
 
         if test_model is not None:
             self.test_model_name, self.model_to_test_path = test_model
@@ -51,26 +59,47 @@ class FMModelsEvaluator:
     def prepare_data(self):
         transform = transforms.Compose([transforms.ToTensor()])
 
-        train_val_set = datasets.FashionMNIST('./data', download=True, train=True, transform=transform)
-        train_set, val_set = torch.utils.data.random_split(train_val_set, (50000, 10000))
-        test_set = datasets.FashionMNIST('./data', download=True, train=False, transform=transform)
+        train_val_set = datasets.FashionMNIST('./data',
+                                              download=True,
+                                              train=True,
+                                              transform=transform)
+        train_set, val_set = torch.utils.data.random_split(
+            train_val_set, (50000, 10000))
+        test_set = datasets.FashionMNIST('./data',
+                                         download=True,
+                                         train=False,
+                                         transform=transform)
 
-        train_set_loader = torch.utils.data.DataLoader(train_set, batch_size=50, shuffle=True)
-        val_set_loader = torch.utils.data.DataLoader(val_set, batch_size=50, shuffle=True)
-        test_set_loader = torch.utils.data.DataLoader(test_set, batch_size=50, shuffle=True)
+        train_set_loader = torch.utils.data.DataLoader(train_set,
+                                                       batch_size=50,
+                                                       shuffle=True)
+        val_set_loader = torch.utils.data.DataLoader(val_set,
+                                                     batch_size=50,
+                                                     shuffle=True)
+        test_set_loader = torch.utils.data.DataLoader(test_set,
+                                                      batch_size=50,
+                                                      shuffle=True)
 
         return train_set_loader, val_set_loader, test_set_loader
 
     def eval(self, train_set_loader, val_set_loader):
         if self.model_type:
-            models = {model_name: model for model_name, model in self.models.items() if self.model_type in model_name}
+            models = {
+                model_name: model
+                for model_name, model in self.models.items()
+                if self.model_type in model_name
+            }
 
         else:
             models = self.models
 
         for model_name, model in models.items():
             criterion, optimizer = self.init_optimizer(model, model_name)
-            self.train(model, train_set_loader, optimizer=optimizer, criterion=criterion, model_name=model_name)
+            self.train(model,
+                       train_set_loader,
+                       optimizer=optimizer,
+                       criterion=criterion,
+                       model_name=model_name)
             accuracy = self.compute_accuracy(model, val_set_loader)
             self.dump_metrics(accuracy, model_name)
 
@@ -79,10 +108,15 @@ class FMModelsEvaluator:
             self.freeze_params(model)
 
         if self.optimizer == 'adam':
-            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=self.lr)
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,
+                                                model.parameters()),
+                                         lr=self.lr)
 
         else:
-            optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=self.lr, momentum=0.9)
+            optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad,
+                                               model.parameters()),
+                                        lr=self.lr,
+                                        momentum=0.9)
 
         criterion = nn.CrossEntropyLoss()
         return criterion, optimizer
@@ -91,19 +125,36 @@ class FMModelsEvaluator:
         train_set_loader, val_set_loader, test_set_loader = self.prepare_data()
 
         if self.model_to_test_path is not None:
-            model = self.load_model(model=self.test_model, optimizer=None, model_params_path=self.model_to_test_path)
+            model = self.load_model(model=self.test_model,
+                                    optimizer=None,
+                                    model_params_path=self.model_to_test_path)
             self.compute_accuracy(model, test_set_loader)
 
         elif self.model_to_resume_path is not None:
             model = self.resume_model
-            criterion, optimizer = self.init_optimizer(model, self.resume_model_name)
-            model, optimizer, loss = self.load_model(model=model, optimizer=optimizer, model_params_path=self.model_to_resume_path)
-            self.train(model, train_set_loader, optimizer, criterion, self.resume_model_name, loss=loss)
+            criterion, optimizer = self.init_optimizer(model,
+                                                       self.resume_model_name)
+            model, optimizer, loss = self.load_model(
+                model=model,
+                optimizer=optimizer,
+                model_params_path=self.model_to_resume_path)
+            self.train(model,
+                       train_set_loader,
+                       optimizer,
+                       criterion,
+                       self.resume_model_name,
+                       loss=loss)
 
         else:
             self.eval(train_set_loader, val_set_loader)
 
-    def train(self, model, train_set_loader, optimizer, criterion, model_name, loss=None):
+    def train(self,
+              model,
+              train_set_loader,
+              optimizer,
+              criterion,
+              model_name,
+              loss=None):
         epoch_n = self.train_epoch
         model = model.train()
 
@@ -133,12 +184,15 @@ class FMModelsEvaluator:
         return model
 
     def save_model(self, epoch, loss, model, optimizer, model_name):
-        save_model_file_path = os.path.join(self.save_model_dir_path, '{}.pth'.format(model_name))
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss}, save_model_file_path)
+        save_model_file_path = os.path.join(self.save_model_dir_path,
+                                            '{}.pth'.format(model_name))
+        torch.save(
+            {
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss
+            }, save_model_file_path)
 
     def plot_losses(self, losses, model_name):
         plt.plot(range(len(losses)), losses)
@@ -175,7 +229,9 @@ class FMModelsEvaluator:
     def dump_metrics(self, accuracy, model_name):
         metrics_file_path = os.path.join(self.save_dir, 'metrics.txt')
         with open(metrics_file_path, "a") as opened_metrics_file:
-            opened_metrics_file.write("model name:{} \naccuracy: {}\n\n".format(model_name, accuracy))
+            opened_metrics_file.write(
+                "model name:{} \naccuracy: {}\n\n".format(
+                    model_name, accuracy))
 
     def load_model(self, model, optimizer, model_params_path):
         checkpoint = torch.load(model_params_path)
@@ -195,13 +251,10 @@ def main():
     parser = argparse.ArgumentParser(prog='Fashion MNIST Models Evaluator')
     setup_argparse_logging_level(parser)
 
-    parser.add_argument(
-        '--model-type',
-        choices=['vgg', 'two_layers', 'sixlayers'],
-        default='two_layers',
-        help=
-        ''
-    )
+    parser.add_argument('--model-type',
+                        choices=['vgg', 'two_layers', 'sixlayers'],
+                        default='two_layers',
+                        help='')
 
     parser.add_argument('-t',
                         '--test-model',
@@ -215,57 +268,24 @@ def main():
                         help='model path and model name',
                         default=None)
 
-    parser.add_argument(
-        '--train-batch-size',
-        default=[50],
-        help=
-        ''
-    )
+    parser.add_argument('--train-batch-size', default=[50], help='')
 
-    parser.add_argument(
-        '--lr',
-        default=0.005,
-        type=float,
-        help=
-        ''
-    )
+    parser.add_argument('--lr', default=0.005, type=float, help='')
 
-    parser.add_argument(
-        '--train-epoch',
-        default=5,
-        type=int,
-        help=
-        ''
-    )
+    parser.add_argument('--train-epoch', default=5, type=int, help='')
 
-    parser.add_argument(
-        '--threshold-validation-accuracy',
-        default=0.80,
-        help=
-        ''
-    )
+    parser.add_argument('--threshold-validation-accuracy',
+                        default=0.80,
+                        help='')
 
-    parser.add_argument(
-        '--seed',
-        default=42,
-        help=
-        ''
-    )
+    parser.add_argument('--seed', default=42, help='')
 
-    parser.add_argument(
-        '--save-dir',
-        default='./data',
-        help=
-        ''
-    )
+    parser.add_argument('--save-dir', default='./data', help='')
 
-    parser.add_argument(
-        '--optimizer',
-        choices=['adam', 'sgd'],
-        default='adam',
-        help=
-        ''
-    )
+    parser.add_argument('--optimizer',
+                        choices=['adam', 'sgd'],
+                        default='adam',
+                        help='')
 
     args = parser.parse_args()
     args = vars(args)
