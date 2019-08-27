@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class FMModelsEvaluator:
     def __init__(self, train_epoch, lr, train_batch_size, test_model,
                  model_type, seed, save_dir, resume_model, optimizer,
-                 dump_metrics_frequency):
+                 dump_metrics_frequency, threshold_validation_accuracy):
         self.train_epoch = train_epoch
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
@@ -55,6 +55,7 @@ class FMModelsEvaluator:
 
         self.optimizer = optimizer
         self.dump_metrics_frequency = dump_metrics_frequency
+        self.threshold_validation_accuracy = threshold_validation_accuracy
 
     def prepare_data(self):
         transform = transforms.Compose([transforms.ToTensor()])
@@ -178,20 +179,23 @@ class FMModelsEvaluator:
                 loss.backward()
                 optimizer.step()
 
-                if batch_id % self.dump_metrics_frequency == 0:
-                    self.dump_metrics_and_save_model(epoch, epoch_n, loss,
-                                                     losses, model, model_name,
-                                                     optimizer, val_set_loader)
+                if (batch_id != 0) and (batch_id % self.dump_metrics_frequency == 0):
+                    accuracy = self.compute_accuracy(model, val_set_loader)
+                    self.dump_metrics_and_save_model(accuracy, epoch, epoch_n,
+                                                     loss, losses, model,
+                                                     model_name, optimizer,
+                                                     batch_id)
+                    if accuracy >= self.threshold_validation_accuracy:
+                        break
+            else:
+                continue
 
-        self.dump_metrics_and_save_model(epoch, epoch_n, loss, losses, model,
-                                         model_name, optimizer, val_set_loader)
+            break
 
-        return model
-
-    def dump_metrics_and_save_model(self, epoch, epoch_n, loss, losses, model,
-                                    model_name, optimizer, val_set_loader):
-        accuracy = self.compute_accuracy(model, val_set_loader)
-        self.dump_accuracy(accuracy, model_name)
+    def dump_metrics_and_save_model(self, accuracy, epoch, epoch_n, loss,
+                                    losses, model, model_name, optimizer,
+                                    batch_id):
+        self.dump_accuracy(accuracy, model_name, epoch, batch_id)
         self.save_model(epoch, loss, model, optimizer, model_name)
         self.plot_losses(losses, model_name)
         logger.info('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch,
@@ -230,7 +234,7 @@ class FMModelsEvaluator:
             correct = 0
             total = 0
             for batch_id, (image, label) in enumerate(data_set):
-                logger.info("compute_acc", batch_id)
+                logger.info(batch_id)
                 image = image.to(self.device)
                 label = label.to(self.device)
                 outputs = model(image)
@@ -241,13 +245,16 @@ class FMModelsEvaluator:
         logger.info(accuracy)
         return accuracy
 
-    def dump_accuracy(self, accuracy, model_name):
+    def dump_accuracy(self, accuracy, model_name, epoch, batch_idx):
         metrics_dir_path = os.path.join(self.save_dir, 'metrics')
         metrics_file_path = os.path.join(metrics_dir_path,
                                          '{}.txt'.format(model_name))
         with open(metrics_file_path, "a") as opened_metrics_file:
             opened_metrics_file.write(
-                "val accuracy:\naccuracy: {}\n\n".format(accuracy))
+                "epoch:{epoch} batch_idx:{batch_idx} val_accuracy:{val_accuracy}\n"
+                .format(epoch=epoch,
+                        batch_idx=batch_idx,
+                        val_accuracy=accuracy))
 
     def load_model(self, model, optimizer, model_params_path):
         checkpoint = torch.load(model_params_path)
@@ -302,6 +309,12 @@ def main():
     parser.add_argument('--dump-metrics-frequency',
                         metavar='Batch_n',
                         default='200',
+                        type=int,
+                        help='dump metrics every Batch_n batches')
+
+    parser.add_argument('--threshold-validation-accuracy',
+                        default='0.95',
+                        type=float,
                         help='dump metrics every Batch_n batches')
 
     args = parser.parse_args()
