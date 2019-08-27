@@ -29,8 +29,11 @@ class FMModelsEvaluator:
         self.save_dir = save_dir
         self.loss_plots_dir = os.path.join(save_dir, 'losses_plots')
         self.save_model_dir_path = os.path.join(save_dir, 'models')
+        self.metrics_dir_path = os.path.join(self.save_dir, 'metrics')
+
         os.makedirs(self.loss_plots_dir, exist_ok=True)
         os.makedirs(self.save_model_dir_path, exist_ok=True)
+        os.makedirs(self.metrics_dir_path, exist_ok=True)
 
         self.models = {
             'two_layers':
@@ -246,8 +249,7 @@ class FMModelsEvaluator:
         return accuracy
 
     def dump_accuracy(self, accuracy, model_name, epoch, batch_idx):
-        metrics_dir_path = os.path.join(self.save_dir, 'metrics')
-        metrics_file_path = os.path.join(metrics_dir_path,
+        metrics_file_path = os.path.join(self.metrics_dir_path,
                                          '{}.txt'.format(model_name))
         with open(metrics_file_path, "a") as opened_metrics_file:
             opened_metrics_file.write(
