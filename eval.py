@@ -140,7 +140,7 @@ class FMModelsEvaluator:
             model = self.resume_model
             criterion, optimizer = self.init_optimizer(model,
                                                        self.resume_model_name)
-            model, optimizer, loss, epoch = self.load_model(
+            model, optimizer, losses, epoch = self.load_model(
                 model=model,
                 optimizer=optimizer,
                 model_params_path=self.model_to_resume_path)
@@ -150,7 +150,7 @@ class FMModelsEvaluator:
                        optimizer=optimizer,
                        criterion=criterion,
                        model_name=self.resume_model_name,
-                       loss=loss,
+                       losses=losses,
                        epoch_start_idx=epoch)
 
         else:
@@ -163,15 +163,19 @@ class FMModelsEvaluator:
               optimizer,
               criterion,
               model_name,
-              loss=None,
-              epoch_start_idx=1):
+              losses=None,
+              epoch_start_idx=0):
+
+        batch_id = None
+        loss = None
+
+        if losses is None:
+            losses = []
 
         epoch_n = self.train_epoch
         model = model.train()
-        epoch = None
-        losses = []
 
-        for epoch in range(epoch_start_idx, epoch_n + 1):
+        for epoch in range(epoch_start_idx + 1, epoch_n + 1):
             for batch_id, (image, label) in enumerate(train_set_loader):
                 logger.info(batch_id)
                 label, image = label.to(self.device), image.to(self.device)
@@ -188,9 +192,15 @@ class FMModelsEvaluator:
                                                      loss, losses, model,
                                                      model_name, optimizer,
                                                      batch_id)
+
                     if accuracy >= self.threshold_validation_accuracy:
                         break
             else:
+                accuracy = self.compute_accuracy(model, val_set_loader)
+                self.dump_metrics_and_save_model(accuracy, epoch, epoch_n,
+                                                 loss, losses, model,
+                                                 model_name, optimizer,
+                                                 batch_id)
                 continue
 
             break
@@ -199,12 +209,12 @@ class FMModelsEvaluator:
                                     losses, model, model_name, optimizer,
                                     batch_id):
         self.dump_accuracy(accuracy, model_name, epoch, batch_id)
-        self.save_model(epoch, loss, model, optimizer, model_name)
+        self.save_model(epoch, losses, model, optimizer, model_name)
         self.plot_losses(losses, model_name)
         logger.info('Loss :{:.4f} Epoch[{}/{}]'.format(loss.item(), epoch,
                                                        epoch_n))
 
-    def save_model(self, epoch, loss, model, optimizer, model_name):
+    def save_model(self, epoch, losses, model, optimizer, model_name):
         save_model_file_path = os.path.join(self.save_model_dir_path,
                                             '{}.pth'.format(model_name))
         torch.save(
@@ -212,7 +222,7 @@ class FMModelsEvaluator:
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
-                'loss': loss
+                'losses': losses
             }, save_model_file_path)
 
     def plot_losses(self, losses, model_name):
@@ -244,7 +254,7 @@ class FMModelsEvaluator:
                 predicted = torch.argmax(outputs, dim=1)
                 total += label.size(0)
                 correct += (predicted == label).sum().item()
-            accuracy = 100 * correct / total
+            accuracy = correct / total
         logger.info(accuracy)
         return accuracy
 
@@ -265,8 +275,8 @@ class FMModelsEvaluator:
         if self.model_to_resume_path is not None:
             optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             epoch = checkpoint['epoch']
-            loss = checkpoint['loss']
-            return model.to(self.device), optimizer, loss, epoch
+            losses = checkpoint['losses']
+            return model.to(self.device), optimizer, losses, epoch
 
         else:
             return model.to(self.device)
