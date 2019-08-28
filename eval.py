@@ -38,11 +38,21 @@ class FMModelsEvaluator:
         os.makedirs(self.metrics_dir_path, exist_ok=True)
 
         self.models = {
-            'two_layers':
-            TwoLayers(num_classes=10).to(self.device),
+            'two_conv':
+            TwoConv(num_classes=10).to(self.device),
+            'two_conv_augmented':
+            TwoConv(num_classes=10).to(self.device),
+            'seven_conv':
+            seven_conv(num_classes=10),
+            'seven_conv_bn':
+            seven_conv_bn(num_classes=10),
+            'seven_conv_bn_augmented':
+            seven_conv_bn(num_classes=10),
             'vgg16_pretrained':
             vgg16(pretrained=True, num_classes=10).to(self.device),
             'vgg16':
+            vgg16(num_classes=10).to(self.device),
+            'vgg16_pretrained_augmented':
             vgg16(num_classes=10).to(self.device)
         }
 
@@ -209,7 +219,8 @@ class FMModelsEvaluator:
                 loss.backward()
                 optimizer.step()
 
-                if (batch_id != 0) and (batch_id % self.dump_metrics_frequency == 0):
+                if (batch_id != 0) and (batch_id %
+                                        self.dump_metrics_frequency == 0):
                     accuracy = self.compute_accuracy(model, val_set_loader)
                     self.dump_metrics_and_save_model(accuracy, epoch, epoch_n,
                                                      loss, losses, model,
@@ -345,12 +356,13 @@ def main():
                         metavar='Batch_n',
                         default='200',
                         type=int,
-                        help='dump metrics every Batch_n batches')
+                        help='Dump metrics every Batch_n batches')
 
-    parser.add_argument('--threshold-validation-accuracy',
-                        default='0.95',
-                        type=float,
-                        help='dump metrics every Batch_n batches')
+    parser.add_argument(
+        '--threshold-validation-accuracy',
+        default='0.95',
+        type=float,
+        help='Threshold validation to reach for stopping training')
 
     args = parser.parse_args()
     args = vars(args)
