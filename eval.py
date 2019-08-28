@@ -7,6 +7,7 @@ from models.vgg import VGG, vgg16
 from models.two_layers import TwoLayers
 import logging
 from utils.logging import setup_logging, setup_argparse_logging_level
+from utils.dataset import DatasetTransformer
 import argparse
 import time
 import os
@@ -60,22 +61,42 @@ class FMModelsEvaluator:
         self.dump_metrics_frequency = dump_metrics_frequency
         self.threshold_validation_accuracy = threshold_validation_accuracy
 
+        self.train_set_loader, self.augmented_train_set_loader, self.val_set_loader, self.test_set_loader = self.prepare_data(
+        )
+
     def prepare_data(self):
-        transform = transforms.Compose([transforms.ToTensor()])
+        to_tensor_transform = transforms.Compose([transforms.ToTensor()])
+        augment_to_tensor_transform = transforms.Compose([
+            transforms.RandomHorizontalFlip(0.5),
+            transforms.RandomAffine(degrees=10, translate=(0.1, 0.1)),
+            transforms.ToTensor()
+        ])
 
         train_val_set = datasets.FashionMNIST('./data',
                                               download=True,
                                               train=True,
-                                              transform=transform)
+                                              transform=None)
         train_set, val_set = torch.utils.data.random_split(
             train_val_set, (50000, 10000))
         test_set = datasets.FashionMNIST('./data',
                                          download=True,
                                          train=False,
-                                         transform=transform)
+                                         transform=None)
+
+        train_set = DatasetTransformer(train_set, to_tensor_transform)
+        augmented_train_set = DatasetTransformer(train_set,
+                                                 augment_to_tensor_transform)
+        val_set = DatasetTransformer(val_set, to_tensor_transform)
+        test_set = DatasetTransformer(test_set, to_tensor_transform)
 
         train_set_loader = torch.utils.data.DataLoader(
             train_set, batch_size=self.train_batch_size, shuffle=True)
+
+        augmented_train_set_loader = torch.utils.data.DataLoader(
+            augmented_train_set,
+            batch_size=self.train_batch_size,
+            shuffle=True)
+
         val_set_loader = torch.utils.data.DataLoader(val_set,
                                                      batch_size=50,
                                                      shuffle=True)
@@ -83,9 +104,9 @@ class FMModelsEvaluator:
                                                       batch_size=50,
                                                       shuffle=True)
 
-        return train_set_loader, val_set_loader, test_set_loader
+        return train_set_loader, augmented_train_set_loader, val_set_loader, test_set_loader
 
-    def eval(self, train_set_loader, val_set_loader):
+    def eval(self):
         if self.model_type:
             models = {
                 model_name: model
@@ -97,10 +118,12 @@ class FMModelsEvaluator:
             models = self.models
 
         for model_name, model in models.items():
+            train_set_loader = self.augmented_train_set_loader if 'augmented' in model_name else self.train_set_loader
+
             criterion, optimizer = self.init_optimizer(model, model_name)
             self.train(model=model,
                        train_set_loader=train_set_loader,
-                       val_set_loader=val_set_loader,
+                       val_set_loader=self.val_set_loader,
                        optimizer=optimizer,
                        criterion=criterion,
                        model_name=model_name)
@@ -124,20 +147,19 @@ class FMModelsEvaluator:
         return criterion, optimizer
 
     def run(self):
-        train_set_loader, val_set_loader, test_set_loader = self.prepare_data()
-
         if self.model_to_test_path is not None:
             model = self.load_model(model=self.test_model,
                                     optimizer=None,
                                     model_params_path=self.model_to_test_path)
 
             inference_time_start = time.time()
-            self.compute_accuracy(model, test_set_loader)
+            self.compute_accuracy(model, self.test_set_loader)
             inference_time = time.time() - inference_time_start
             logging.info(inference_time)
 
         elif self.model_to_resume_path is not None:
             model = self.resume_model
+            train_set_loader = self.augmented_train_set_loader if 'augmented' in self.resume_model_name else self.train_set_loader
             criterion, optimizer = self.init_optimizer(model,
                                                        self.resume_model_name)
             model, optimizer, losses, epoch = self.load_model(
@@ -146,7 +168,7 @@ class FMModelsEvaluator:
                 model_params_path=self.model_to_resume_path)
             self.train(model=model,
                        train_set_loader=train_set_loader,
-                       val_set_loader=val_set_loader,
+                       val_set_loader=self.val_set_loader,
                        optimizer=optimizer,
                        criterion=criterion,
                        model_name=self.resume_model_name,
@@ -154,7 +176,7 @@ class FMModelsEvaluator:
                        epoch_start_idx=epoch)
 
         else:
-            self.eval(train_set_loader, val_set_loader)
+            self.eval()
 
     def train(self,
               model,
