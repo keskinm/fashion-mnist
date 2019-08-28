@@ -4,7 +4,8 @@ from torch import nn
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 from models.vgg import VGG, vgg16
-from models.two_layers import TwoLayers
+from models.two_conv_model import TwoConv
+from models.seven_conv_model import seven_conv, seven_conv_bn
 import logging
 from utils.logging import setup_logging, setup_argparse_logging_level
 from utils.dataset import DatasetTransformer
@@ -309,8 +310,8 @@ def main():
     setup_argparse_logging_level(parser)
 
     parser.add_argument('--model-type',
-                        choices=['vgg', 'two_layers', 'sixlayers'],
-                        default='two_layers',
+                        choices=['vgg', 'two_conv'],
+                        default='two_conv',
                         help='')
 
     parser.add_argument('-t',
