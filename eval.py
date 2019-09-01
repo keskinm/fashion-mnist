@@ -4,8 +4,8 @@ from torch import nn
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
 from models.vgg import VGG, vgg16
-from models.two_conv_model import TwoConv
-from models.seven_conv_model import seven_conv, seven_conv_bn
+from models.two_conv_model import two_conv, two_conv_bn
+from models.five_conv_model import five_conv, five_conv_bn
 import logging
 from utils.logging import setup_logging, setup_argparse_logging_level
 from utils.dataset import DatasetTransformer, RandomErasing, CenterReduce, compute_mean_std
@@ -25,7 +25,7 @@ class FMModelsEvaluator:
             'cuda' if torch.cuda.is_available() else 'cpu')
         self.lr = lr
         self.train_batch_size = train_batch_size
-        self.model_type = model_type
+        self.model_type = model_type if model_type is not None else None
         if seed is not None:
             torch.manual_seed(seed)
         self.save_dir = save_dir
@@ -38,16 +38,18 @@ class FMModelsEvaluator:
         os.makedirs(self.metrics_dir_path, exist_ok=True)
 
         self.models = {
+            'five_conv':
+            five_conv().to(self.device),
+            'five_conv_bn':
+            five_conv().to(self.device),
+            'five_conv_bn_augmented':
+            five_conv().to(self.device),
             'two_conv':
-            TwoConv(num_classes=10).to(self.device),
-            'two_conv_augmented':
-            TwoConv(num_classes=10).to(self.device),
-            'seven_conv':
-            seven_conv(num_classes=10),
-            'seven_conv_bn':
-            seven_conv_bn(num_classes=10),
-            'seven_conv_bn_augmented':
-            seven_conv_bn(num_classes=10),
+            two_conv().to(self.device),
+            'two_conv_bn':
+            two_conv_bn().to(self.device),
+            'two_conv_bn_augmented':
+            two_conv_bn().to(self.device),
             'vgg16_pretrained':
             vgg16(pretrained=True, num_classes=10).to(self.device),
             'vgg16':
