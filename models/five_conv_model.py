@@ -5,6 +5,7 @@ from models.utils import _initialize_weights, make_layers
 class FiveConv(nn.Module):
     def __init__(self, features, num_classes=10, init_weights=False):
         super(FiveConv, self).__init__()
+        self.model_name = 'five_conv'
         self.features = features
         self.classifier = nn.Linear(512 * 3 * 3, num_classes)
 
@@ -24,14 +25,7 @@ cfgs = {
 }
 
 
-def _five_conv(cfg, batch_norm, **kwargs):
-    model = FiveConv(make_layers(cfgs[cfg], conv_kernel_size=6, batch_norm=batch_norm), **kwargs)
+def five_conv(cfg, batch_norm, **kwargs):
+    model = FiveConv(make_layers(cfg=cfgs[cfg], conv_kernel_size=6, batch_norm=batch_norm), **kwargs)
     return model
 
-
-def five_conv(**kwargs):
-    return _five_conv('A', batch_norm=False, **kwargs)
-
-
-def five_conv_bn(**kwargs):
-    return _five_conv('A', batch_norm=True, **kwargs)

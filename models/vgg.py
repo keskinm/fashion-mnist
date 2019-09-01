@@ -3,11 +3,6 @@ import torch.nn as nn
 from torch.utils.model_zoo import load_url as load_state_dict_from_url
 from models.utils import make_layers, _initialize_weights
 
-__all__ = [
-    'VGG',
-    'vgg16',
-    'vgg16_bn',
-]
 
 model_urls = {
     'vgg16': 'https://download.pytorch.org/models/vgg16-397923af.pth',
@@ -16,8 +11,10 @@ model_urls = {
 
 
 class VGG(nn.Module):
-    def __init__(self, features, num_classes, init_weights=True):
+    def __init__(self, features, num_classes, pretrained, init_weights=True):
         super(VGG, self).__init__()
+        self.model_name = 'vgg'
+        self.pretrained = pretrained
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
@@ -30,7 +27,7 @@ class VGG(nn.Module):
             nn.Linear(4096, num_classes),
         )
 
-        if init_weights:
+        if init_weights and not pretrained:
             _initialize_weights(self)
 
     def forward(self, x):
@@ -49,13 +46,17 @@ cfgs = {
 }
 
 
-def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
-    if pretrained:
-        kwargs['init_weights'] = False
+def vgg(cfg, batch_norm, progress, **kwargs):
+    pretrained = kwargs['pretrained']
+
     model = VGG(make_layers(cfgs[cfg], conv_kernel_size=3, batch_norm=batch_norm), **kwargs)
 
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls[arch],
+        if batch_norm:
+            model_url = 'https://download.pytorch.org/models/vgg16_bn-6c64b313.pth'
+        else:
+            model_url = 'https://download.pytorch.org/models/vgg16-397923af.pth'
+        state_dict = load_state_dict_from_url(model_url,
                                               progress=progress)
 
         state_dict['features.0.weight'] = state_dict['features.0.weight'][:, 0, :, :].unsqueeze(1)
@@ -63,11 +64,3 @@ def _vgg(arch, cfg, batch_norm, pretrained, progress, **kwargs):
 
         model.load_state_dict(state_dict, strict=False)
     return model
-
-
-def vgg16(pretrained=False, progress=True, **kwargs):
-    return _vgg('vgg16', 'A', False, pretrained, progress, **kwargs)
-
-
-def vgg16_bn(pretrained=False, progress=True, **kwargs):
-    return _vgg('vgg16_bn', 'A', True, pretrained, progress, **kwargs)
