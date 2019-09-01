@@ -388,15 +388,27 @@ def main():
                         type=str,
                         help='model path')
 
-    parser.add_argument('--train-batch-size', default=50, help='batch size for training with Adam')
+    parser.add_argument('--train-batch-size',
+                        default=50,
+                        help='batch size for training with Adam')
 
-    parser.add_argument('--lr', default=0.005, type=float, help='learning rate')
+    parser.add_argument('--lr',
+                        default=0.005,
+                        type=float,
+                        help='learning rate')
 
-    parser.add_argument('--train-epoch', default=60, type=int, help='number of training epoch')
+    parser.add_argument('--train-epoch',
+                        default=60,
+                        type=int,
+                        help='number of training epoch')
 
-    parser.add_argument('--seed', default=42, help='seed')
+    parser.add_argument('--seed',
+                        default=42,
+                        help='seed')
 
-    parser.add_argument('--save-dir', default='./data', help='saving metrics dir')
+    parser.add_argument('--save-dir',
+                        default='./data',
+                        help='saving metrics dir')
 
     parser.add_argument('--optimizer',
                         choices=['adam', 'sgd'],
@@ -410,25 +422,25 @@ def main():
                         help='Dump metrics every Batch_n batches')
 
     parser.add_argument(
-        '--threshold-validation-accuracy',
-        default='0.95',
-        type=float,
-        help='Threshold validation to reach for stopping training')
+                        '--threshold-validation-accuracy',
+                        default='0.95',
+                        type=float,
+                        help='Threshold validation to reach for stopping training')
 
     parser.add_argument(
-        '--num-threads',
-        default='0',
-        type=int,
-        help='Number of CPU to use for processing mini batches')
+                        '--num-threads',
+                        default='0',
+                        type=int,
+                        help='Number of CPU to use for processing mini batches')
 
     parser.add_argument('--scale',
                         action='store_true',
                         help='scale input in [0-1] range')
 
     parser.add_argument(
-        '--standardize',
-        action='store_true',
-        help='Subtract each instance by mean of data and divide by std')
+                        '--standardize',
+                        action='store_true',
+                        help='Subtract each instance by mean of data and divide by std')
 
     parser.add_argument('--augment',
                         action='store_true',
