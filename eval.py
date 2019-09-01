@@ -81,16 +81,6 @@ class FMModelsEvaluator:
         )
 
     def prepare_data(self):
-        to_tensor_transform = transforms.Compose([transforms.ToTensor()])
-
-        augment_to_tensor_transform = transforms.Compose([
-            transforms.RandomCrop(28, padding=0),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            # transforms.Normalize((0.1307,), (0.3081,)),
-            # RandomErasing(probability=0.1, mean=[0.4914]),
-        ])
-
         pil_train_val_set = datasets.FashionMNIST('./data',
                                                   download=True,
                                                   train=True,
@@ -120,7 +110,15 @@ class FMModelsEvaluator:
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Lambda(lambda x: normalization_function(x))
-            # RandomErasing(probability=0.1, mean=[0.4914]),
+            ])
+
+        else:
+            to_tensor_transform = transforms.Compose([transforms.ToTensor()])
+
+            augment_to_tensor_transform = transforms.Compose([
+                transforms.RandomCrop(28, padding=0),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
             ])
 
         train_set = DatasetTransformer(pil_train_set, to_tensor_transform, self.scale)
