@@ -25,7 +25,7 @@ def make_layers(cfg, conv_kernel_size, batch_norm=False):
 
     for v in cfg:
         if v == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            layers += [nn.MaxPool2d(kernel_size=2, stride=1)]
 
         else:
             conv2d = nn.Conv2d(in_channels,
