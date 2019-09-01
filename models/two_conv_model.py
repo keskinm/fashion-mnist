@@ -1,22 +1,33 @@
-from torch import nn
+from torch import nn, flatten
+from models.utils import make_layers
 
 
 class TwoConv(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, features, num_classes=10):
         super(TwoConv, self).__init__()
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=5, stride=1, padding=2),
-            nn.BatchNorm2d(16), nn.ReLU(), nn.MaxPool2d(kernel_size=2,
-                                                        stride=2))
-        self.layer2 = nn.Sequential(
-            nn.Conv2d(16, 32, kernel_size=5, stride=1, padding=2),
-            nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(kernel_size=2,
-                                                        stride=2))
-        self.fc = nn.Linear(7 * 7 * 32, num_classes)
+        self.features = features
+        self.fc = nn.Linear(22 * 22 * 32, num_classes)
 
     def forward(self, x):
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = out.reshape(out.size(0), -1)
-        out = self.fc(out)
-        return out
+        x = self.features(x)
+        x = flatten(x, 1)
+        x = self.fc(x)
+        return x
+
+
+cfgs = {
+    'A': [16, 'M', 32, 'M'],
+}
+
+
+def _two_conv(cfg, batch_norm, **kwargs):
+    model = TwoConv(make_layers(cfgs[cfg], conv_kernel_size=5, batch_norm=batch_norm), **kwargs)
+    return model
+
+
+def two_conv(**kwargs):
+    return _two_conv('A', batch_norm=False, **kwargs)
+
+
+def two_conv_bn(**kwargs):
+    return _two_conv('A', batch_norm=True, **kwargs)
