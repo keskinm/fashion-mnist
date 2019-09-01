@@ -224,6 +224,11 @@ class FMModelsEvaluator:
         else:
             self.eval()
 
+    def adjust_learning_rate(self, optimizer, epoch):
+        lr = self.lr * (0.1 ** (epoch // 30))
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
+
     def train(self,
               model,
               train_set_loader,
@@ -245,6 +250,7 @@ class FMModelsEvaluator:
 
         for epoch in range(epoch_start_idx + 1, epoch_n + 1):
             for batch_id, (image, label) in enumerate(train_set_loader):
+                self.adjust_learning_rate(optimizer, epoch)
                 logger.info(batch_id)
                 label, image = label.to(self.device), image.to(self.device)
                 output = model(image)
