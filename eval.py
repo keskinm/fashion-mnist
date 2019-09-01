@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class FMModelsEvaluator:
     def __init__(self, train_epoch, lr, train_batch_size, test_model,
                  model_type, seed, save_dir, resume_model, optimizer,
-                 dump_metrics_frequency, threshold_validation_accuracy):
+                 dump_metrics_frequency, threshold_validation_accuracy, num_threads, standardize, scale):
         self.train_epoch = train_epoch
         self.device = torch.device(
             'cuda' if torch.cuda.is_available() else 'cpu')
@@ -73,6 +73,9 @@ class FMModelsEvaluator:
         self.optimizer = optimizer
         self.dump_metrics_frequency = dump_metrics_frequency
         self.threshold_validation_accuracy = threshold_validation_accuracy
+        self.num_threads = num_threads
+        self.standardize = standardize
+        self.scale = scale
 
         self.train_set_loader, self.augmented_train_set_loader, self.val_set_loader, self.test_set_loader = self.prepare_data(
         )
