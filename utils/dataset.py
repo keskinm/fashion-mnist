@@ -1,11 +1,9 @@
 import torch
 import random
-import math
 from torchvision import transforms
 
 
 def compute_mean_std(loader):
-    # Compute the mean over minibatches
     mean_img = None
     for imgs, _ in loader:
         if mean_img is None:
@@ -13,16 +11,12 @@ def compute_mean_std(loader):
         mean_img += imgs.sum(dim=0)
     mean_img /= len(loader.dataset)
 
-    # Compute the std over minibatches
     std_img = torch.zeros_like(mean_img)
     for imgs, _ in loader:
         std_img += ((imgs - mean_img) ** 2).sum(dim=0)
     std_img /= len(loader.dataset)
     std_img = torch.sqrt(std_img)
 
-    # Set the variance of pixels with no variance to 1
-    # Because there is no variance
-    # these pixels will anyway have no impact on the final decision
     std_img[std_img == 0] = 1
 
     return mean_img, std_img
