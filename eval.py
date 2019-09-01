@@ -8,7 +8,7 @@ from models.two_conv_model import TwoConv
 from models.seven_conv_model import seven_conv, seven_conv_bn
 import logging
 from utils.logging import setup_logging, setup_argparse_logging_level
-from utils.dataset import DatasetTransformer
+from utils.dataset import DatasetTransformer, RandomErasing, CenterReduce, compute_mean_std
 import argparse
 import time
 import os
