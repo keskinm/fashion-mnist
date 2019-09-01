@@ -168,6 +168,14 @@ class FMModelsEvaluator:
                 model = two_conv(**self.model_cfg, cfg='A')
             else:
                 model = two_conv(cfg='A', batch_norm=False)
+
+        if self.augment:
+            model.model_name += '_augment'
+        if self.scale:
+            model.model_name += '_scale'
+        if self.standardize:
+            model.model_name += '_standardize'
+
         return model.to(self.device)
 
     def init_optimizer(self, model):
