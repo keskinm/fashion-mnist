@@ -3,12 +3,12 @@ from models.utils import _initialize_weights, make_layers
 
 
 class FiveConv(nn.Module):
-    def __init__(self, features, num_classes=10, init_weights=False):
+    def __init__(self, features, batch_norm, num_classes=10, init_weights=False):
         super(FiveConv, self).__init__()
         self.model_name = 'five_conv'
+        self.model_name += '_batch_norm'
         self.features = features
         self.classifier = nn.Linear(512 * 3 * 3, num_classes)
-
         if init_weights:
             _initialize_weights(self)
 
@@ -25,7 +25,8 @@ cfgs = {
 }
 
 
-def five_conv(cfg, batch_norm, **kwargs):
+def five_conv(cfg, **kwargs):
+    batch_norm = kwargs['batch_norm']
     model = FiveConv(make_layers(cfg=cfgs[cfg], conv_kernel_size=6, batch_norm=batch_norm), **kwargs)
     return model
 

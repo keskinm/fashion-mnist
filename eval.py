@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 from torch import nn
 from torchvision import datasets, transforms
 import matplotlib.pyplot as plt
-from models.vgg import VGG, vgg
+from models.vgg import vgg, VGG
 from models.two_conv_model import two_conv
 from models.five_conv_model import five_conv
 import logging

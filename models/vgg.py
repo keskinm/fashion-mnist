@@ -4,17 +4,15 @@ from torch.utils.model_zoo import load_url as load_state_dict_from_url
 from models.utils import make_layers, _initialize_weights
 
 
-model_urls = {
-    'vgg16': 'https://download.pytorch.org/models/vgg16-397923af.pth',
-    'vgg16_bn': 'https://download.pytorch.org/models/vgg16_bn-6c64b313.pth',
-}
-
-
 class VGG(nn.Module):
-    def __init__(self, features, num_classes, pretrained, init_weights=True):
+    def __init__(self, features, num_classes, pretrained, batch_norm, init_weights=True):
         super(VGG, self).__init__()
         self.model_name = 'vgg'
-        self.pretrained = pretrained
+        if pretrained:
+            self.model_name += '_pretrained'
+        if batch_norm:
+            self.model_name += '_batch_norm'
+
         self.features = features
         self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
         self.classifier = nn.Sequential(
@@ -46,8 +44,9 @@ cfgs = {
 }
 
 
-def vgg(cfg, batch_norm, progress, **kwargs):
+def vgg(cfg, progress, **kwargs):
     pretrained = kwargs['pretrained']
+    batch_norm = kwargs['batch_norm']
 
     model = VGG(make_layers(cfgs[cfg], conv_kernel_size=3, batch_norm=batch_norm), **kwargs)
 
