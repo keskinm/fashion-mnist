@@ -77,43 +77,73 @@ class FMModelsEvaluator:
 
     def prepare_data(self):
         to_tensor_transform = transforms.Compose([transforms.ToTensor()])
+
         augment_to_tensor_transform = transforms.Compose([
-            transforms.RandomHorizontalFlip(0.5),
-            transforms.RandomAffine(degrees=10, translate=(0.1, 0.1)),
-            transforms.ToTensor()
+            transforms.RandomCrop(28, padding=0),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            # transforms.Normalize((0.1307,), (0.3081,)),
+            # RandomErasing(probability=0.1, mean=[0.4914]),
         ])
 
-        train_val_set = datasets.FashionMNIST('./data',
-                                              download=True,
-                                              train=True,
-                                              transform=None)
-        train_set, val_set = torch.utils.data.random_split(
-            train_val_set, (50000, 10000))
-        test_set = datasets.FashionMNIST('./data',
-                                         download=True,
-                                         train=False,
-                                         transform=None)
+        pil_train_val_set = datasets.FashionMNIST('./data',
+                                                  download=True,
+                                                  train=True,
+                                                  transform=None)
+        pil_train_set, pil_val_set = torch.utils.data.random_split(
+            pil_train_val_set, (50000, 10000))
+        pil_test_set = datasets.FashionMNIST('./data',
+                                             download=True,
+                                             train=False,
+                                             transform=None)
 
-        train_set = DatasetTransformer(train_set, to_tensor_transform)
-        augmented_train_set = DatasetTransformer(train_set,
-                                                 augment_to_tensor_transform)
-        val_set = DatasetTransformer(val_set, to_tensor_transform)
-        test_set = DatasetTransformer(test_set, to_tensor_transform)
+        if self.standardize:
+            standardazing_dataset = DatasetTransformer(pil_train_val_set, transforms.ToTensor(), self.scale)
+            standardizing_loader = torch.utils.data.DataLoader(dataset=standardazing_dataset,
+                                                             batch_size=self.train_batch_size,
+                                                             num_workers=self.num_threads)
 
-        train_set_loader = torch.utils.data.DataLoader(
-            train_set, batch_size=self.train_batch_size, shuffle=True)
+            # Compute mean and variance from the training set
+            mean_train_tensor, std_train_tensor = compute_mean_std(standardizing_loader)
+
+            normalization_function = CenterReduce(mean_train_tensor,
+                                                  std_train_tensor)
+
+            to_tensor_transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: normalization_function(x))])
+            augment_to_tensor_transform = transforms.Compose([
+            transforms.RandomCrop(28, padding=0),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: normalization_function(x))
+            # RandomErasing(probability=0.1, mean=[0.4914]),
+            ])
+
+        train_set = DatasetTransformer(pil_train_set, to_tensor_transform, self.scale)
+        augmented_train_set = DatasetTransformer(pil_train_set,
+                                                 augment_to_tensor_transform, self.scale, augment_prob=0.5)
+
+        valid_set = DatasetTransformer(pil_val_set, to_tensor_transform, self.scale)
+        test_set = DatasetTransformer(pil_test_set, to_tensor_transform, self.scale)
+
+        train_set_loader = torch.utils.data.DataLoader(dataset=train_set,
+                                                       batch_size=self.train_batch_size,
+                                                       shuffle=True,
+                                                       num_workers=self.num_threads)
 
         augmented_train_set_loader = torch.utils.data.DataLoader(
             augmented_train_set,
             batch_size=self.train_batch_size,
-            shuffle=True)
+            shuffle=True,
+            num_workers=self.num_threads)
 
-        val_set_loader = torch.utils.data.DataLoader(val_set,
-                                                     batch_size=50,
-                                                     shuffle=True)
-        test_set_loader = torch.utils.data.DataLoader(test_set,
+        val_set_loader = torch.utils.data.DataLoader(dataset=valid_set,
+                                                     batch_size=50, shuffle=True,
+                                                     num_workers=self.num_threads)
+
+        test_set_loader = torch.utils.data.DataLoader(dataset=test_set,
                                                       batch_size=50,
-                                                      shuffle=True)
+                                                      shuffle=False,
+                                                      num_workers=self.num_threads)
 
         return train_set_loader, augmented_train_set_loader, val_set_loader, test_set_loader
 
@@ -321,8 +351,8 @@ def main():
     setup_argparse_logging_level(parser)
 
     parser.add_argument('--model-type',
-                        choices=['vgg', 'two_conv'],
-                        default='two_conv',
+                        choices=['vgg', 'two_conv', 'five_conv'],
+                        default=None,
                         help='')
 
     parser.add_argument('-t',
@@ -341,7 +371,7 @@ def main():
 
     parser.add_argument('--lr', default=0.005, type=float, help='')
 
-    parser.add_argument('--train-epoch', default=5, type=int, help='')
+    parser.add_argument('--train-epoch', default=60, type=int, help='')
 
     parser.add_argument('--seed', default=42, help='')
 
@@ -354,7 +384,7 @@ def main():
 
     parser.add_argument('--dump-metrics-frequency',
                         metavar='Batch_n',
-                        default='200',
+                        default='600',
                         type=int,
                         help='Dump metrics every Batch_n batches')
 
@@ -363,6 +393,22 @@ def main():
         default='0.95',
         type=float,
         help='Threshold validation to reach for stopping training')
+
+    parser.add_argument(
+        '--num-threads',
+        default='0',
+        type=int,
+        help='Number of CPU to use for processing mini batches')
+
+    parser.add_argument(
+        '--scale',
+        action='store_true',
+        help='scale input in [0-1] range')
+
+    parser.add_argument(
+        '--standardize',
+        action='store_true',
+        help='Subtract each instance by mean of data and divide by std')
 
     args = parser.parse_args()
     args = vars(args)
