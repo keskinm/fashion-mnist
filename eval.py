@@ -365,6 +365,7 @@ def main():
 
     parser.add_argument('--model-type',
                         choices=['vgg', 'two_conv', 'five_conv'],
+                        required=True,
                         help='')
 
     parser.add_argument('-t',
