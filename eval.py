@@ -379,15 +379,15 @@ def main():
                         type=str,
                         help='model path')
 
-    parser.add_argument('--train-batch-size', default=50, help='')
+    parser.add_argument('--train-batch-size', default=50, help='batch size for training with Adam')
 
-    parser.add_argument('--lr', default=0.005, type=float, help='')
+    parser.add_argument('--lr', default=0.005, type=float, help='learning rate')
 
-    parser.add_argument('--train-epoch', default=60, type=int, help='')
+    parser.add_argument('--train-epoch', default=60, type=int, help='number of training epoch')
 
-    parser.add_argument('--seed', default=42, help='')
+    parser.add_argument('--seed', default=42, help='seed')
 
-    parser.add_argument('--save-dir', default='./data', help='')
+    parser.add_argument('--save-dir', default='./data', help='saving metrics dir')
 
     parser.add_argument('--optimizer',
                         choices=['adam', 'sgd'],
