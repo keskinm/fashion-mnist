@@ -20,12 +20,6 @@ a certain class label and improves the robustness of the feature detectors in co
 Ryo Takahashi, Takashi Matsubara, Kuniaki Uehara](https://arxiv.org/abs/1409.1556) 
 
 
-
-[Very Deep Convolutional Networks for Large-Scale Image Recognition
-Karen Simonyan, Andrew Zisserman](https://arxiv.org/abs/1409.1556) 
-
-
-
 ## Args:
     parser.add_argument('--model-type',
                         choices=['vgg', 'two_conv', 'five_conv'],
