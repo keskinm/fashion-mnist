@@ -5,9 +5,9 @@
 
 | Classifier | Preprocessing | Fashion test accuracy | Inference time (ms/image) | 
 | --- | --- | --- | --- | 
-|2 Conv+pooling ~168k params | Scaling, Random cropping, Random Horizontal flip, BN | 0.9056 | 0.3 |
-|5 Conv+pooling ~3M params | Scaling, Random cropping, Random Horizontal flip, BN | 0.846 | 1 |
-|VGG16 138M params minus 5 first convolution which are frozen| Scaling, Random cropping, Random Horizontal flip, BN| 0.9369| 4.5 |
+|2 Conv+pooling ~168k params | Normalization, Random cropping, Random Horizontal flip, BN | 0.9056 | 0.3 |
+|5 Conv+pooling ~3M params | Normalization, Random cropping, Random Horizontal flip, BN | 0.846 | 1 |
+|VGG16 138M params minus 5 first convolution which are frozen| Normalization| 0.9369| 4.5 |
 
 
 ##### Random cropping 
@@ -111,6 +111,8 @@ Karen Simonyan, Andrew Zisserman](https://arxiv.org/abs/1409.1556)
                         help='Use batch norm')
 
 ### Examples:
+
+
 #### Training:
 `python -m eval --model-type two_conv --train-epoch 60`
 
